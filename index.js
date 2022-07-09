@@ -26,6 +26,7 @@ module.exports = co['default'] = co.co = co;
 co.wrap = function (fn) {
   createPromise.__generatorFunction__ = fn;
   return createPromise;
+  
   function createPromise() {
     return co.call(this, fn.apply(this, arguments));
   }
@@ -42,15 +43,17 @@ co.wrap = function (fn) {
 
 function co(gen) {
   var ctx = this;
-  var args = slice.call(arguments, 1);
+  var args = slice.call(arguments, 1); // 保存除了 gen 以外的所有参数
 
   // we wrap everything in a promise to avoid promise chaining,
   // which leads to memory leak errors.
   // see https://github.com/tj/co/issues/180
   return new Promise(function(resolve, reject) {
+    // 如果是个函数 就把this(上下文 以及 参数作为 函数的参数传递)
     if (typeof gen === 'function') gen = gen.apply(ctx, args);
     if (!gen || typeof gen.next !== 'function') return resolve(gen);
 
+    //  直接调用成功回调
     onFulfilled();
 
     /**
@@ -59,13 +62,15 @@ function co(gen) {
      * @api private
      */
 
+    // 成功回调的实现  
     function onFulfilled(res) {
-      var ret;
+      var ret; // 保存 next 的执行结果
       try {
         ret = gen.next(res);
       } catch (e) {
         return reject(e);
       }
+      // 讲next 的执行结果作为 参数返回给next
       next(ret);
       return null;
     }
@@ -75,7 +80,7 @@ function co(gen) {
      * @return {Promise}
      * @api private
      */
-
+    // 原理同上
     function onRejected(err) {
       var ret;
       try {
@@ -94,11 +99,14 @@ function co(gen) {
      * @return {Promise}
      * @api private
      */
-
+    // next 实现 反复很执行 next  直到 generator 执行完毕
     function next(ret) {
       if (ret.done) return resolve(ret.value);
+
       var value = toPromise.call(ctx, ret.value);
+
       if (value && isPromise(value)) return value.then(onFulfilled, onRejected);
+
       return onRejected(new TypeError('You may only yield a function, promise, generator, array, or object, '
         + 'but the following object was passed: "' + String(ret.value) + '"'));
     }
